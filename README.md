@@ -47,6 +47,7 @@ Note: The API saves bookings to SQL Server. Make sure SQL Server is running and 
 
 ## Author
 - martin cene
+- Email: cenemartin14@gmail.com
 
 ## Git & GitHub (Step-by-Step)
 1. Initialize the repository:
