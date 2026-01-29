@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlyFast Airways  | Edit Booking</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="booking-body">
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const API_BASE = "http://localhost:5143";
+
+      function EditBookingPage() {
+        const [form, setForm] = React.useState({
+          bookingId: "",
+          passengerName: "",
+          email: "",
+          seatNumber: "",
+        });
+        const [errors, setErrors] = React.useState({});
+        const [message, setMessage] = React.useState("");
+        const [saving, setSaving] = React.useState(false);
+
+        const handleChange = (event) => {
+          setForm({ ...form, [event.target.name]: event.target.value });
+        };
+
+        const validate = () => {
+          const nextErrors = {};
+          const seatPattern = /^[1-9][0-9]?[A-F]$/;
+
+          if (!form.bookingId.trim()) {
+            nextErrors.bookingId = "Booking ID is required.";
+          }
+
+          if (!form.passengerName.trim()) {
+            nextErrors.passengerName = "Passenger name is required.";
+          }
+
+          if (!form.email.trim()) {
+            nextErrors.email = "Email is required.";
+          }
+
+          if (!form.seatNumber.trim()) {
+            nextErrors.seatNumber = "Seat number is required.";
+          } else if (!seatPattern.test(form.seatNumber)) {
+            nextErrors.seatNumber = "Seat must look like 12A.";
+          }
+
+          return nextErrors;
+        };
+
+        const handleSubmit = async (event) => {
+          event.preventDefault();
+          const nextErrors = validate();
+          setErrors(nextErrors);
+          setMessage("");
+
+          if (Object.keys(nextErrors).length !== 0) {
+            return;
+          }
+
+          try {
+            setSaving(true);
+            const response = await fetch(`${API_BASE}/api/bookings/${form.bookingId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                passengerName: form.passengerName,
+                email: form.email,
+                seatNumber: form.seatNumber,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error("Update failed. Check the booking ID.");
+            }
+
+            setMessage("Booking updated successfully.");
+          } catch (error) {
+            setMessage(error.message);
+          } finally {
+            setSaving(false);
+          }
+        };
+
+        return (
+          <div className="page">
+            <header className="site-header">
+              <div className="brand">
+                <div className="brand-mark">FF</div>
+                <div className="brand-copy">
+                  <span className="brand-title">FlyFast Airways</span>
+                  <span className="brand-subtitle">Edit booking</span>
+                </div>
+              </div>
+              <nav className="site-nav">
+                <a href="flights.html">Flights</a>
+                <a href="book.html">Book</a>
+                <a className="active" href="edit.html">Edit booking</a>
+              </nav>
+            </header>
+
+            <main className="container">
+              <h1 className="page-title">Edit booking</h1>
+              <p className="page-subtitle">Update passenger details or seat number.</p>
+
+              <section className="form-card">
+                <form onSubmit={handleSubmit} noValidate>
+                  <label className="form-row">
+                    Booking ID
+                    <input
+                      className="input"
+                      type="text"
+                      name="bookingId"
+                      value={form.bookingId}
+                      onChange={handleChange}
+                      placeholder="1"
+                      required
+                    />
+                    {errors.bookingId && <span className="error">{errors.bookingId}</span>}
+                  </label>
+
+                  <label className="form-row">
+                    Passenger name
+                    <input
+                      className="input"
+                      type="text"
+                      name="passengerName"
+                      value={form.passengerName}
+                      onChange={handleChange}
+                      placeholder="Name Surname"
+                      required
+                    />
+                    {errors.passengerName && <span className="error">{errors.passengerName}</span>}
+                  </label>
+
+                  <label className="form-row">
+                    Email
+                    <input
+                      className="input"
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder="name@email.com"
+                      required
+                    />
+                    {errors.email && <span className="error">{errors.email}</span>}
+                  </label>
+
+                  <label className="form-row">
+                    Seat number
+                    <input
+                      className="input"
+                      type="text"
+                      name="seatNumber"
+                      value={form.seatNumber}
+                      onChange={handleChange}
+                      placeholder="12A"
+                      required
+                    />
+                    {errors.seatNumber && <span className="error">{errors.seatNumber}</span>}
+                  </label>
+
+                  <button className="btn" type="submit" disabled={saving}>
+                    {saving ? "Updating..." : "Update booking"}
+                  </button>
+                  {message && <div className="form-message">{message}</div>}
+                </form>
+              </section>
+
+              <div className="footer">Need a new booking? Go to the Book page.</div>
+            </main>
+
+            <footer className="site-footer">
+              <div>FlyFast Airways</div>
+              <div>support@flyfast.example</div>
+              <div>Tirana International Airport (TIA)</div>
+            </footer>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("app"));
+      root.render(<EditBookingPage />);
+    </script>
+  </body>
+</html>

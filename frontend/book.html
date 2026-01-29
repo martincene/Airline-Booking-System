@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlyFast Airways | Book Flight</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="booking-body">
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="flights.data.js"></script>
+
+    <script type="text/babel">
+      const API_BASE = "http://localhost:5143";
+
+      function BookPage() {
+        const [form, setForm] = React.useState({
+          passengerName: "",
+          email: "",
+          destination: "",
+          seatNumber: "",
+          travelDate: "",
+        });
+        const [errors, setErrors] = React.useState({});
+        const [message, setMessage] = React.useState("");
+        const [saving, setSaving] = React.useState(false);
+        const [seatOptions, setSeatOptions] = React.useState([]);
+        const [ticket, setTicket] = React.useState(null);
+
+        const seatColumns = ["A", "B", "C", "D", "E", "F"];
+
+        const buildSeatList = (availableSeats) => {
+          const seats = [];
+          for (let row = 1; row <= 60; row += 1) {
+            for (const col of seatColumns) {
+              seats.push(`${row}${col}`);
+            }
+          }
+
+          if (Number.isFinite(availableSeats) && availableSeats > 0) {
+            return seats.slice(0, availableSeats);
+          }
+
+          return seats;
+        };
+
+        const handleSeatPick = (seat) => {
+          setForm({ ...form, seatNumber: seat });
+        };
+
+        const handleChange = (event) => {
+          const { name, value } = event.target;
+
+          if (name === "destination") {
+            const selected = flights.find((flight) => flight.to === value);
+            const nextSeats = buildSeatList(selected?.seats ?? 0);
+            setSeatOptions(nextSeats);
+            setForm({ ...form, destination: value, seatNumber: "" });
+            return;
+          }
+
+          setForm({ ...form, [name]: value });
+        };
+
+        const validate = () => {
+          const nextErrors = {};
+          const namePattern = /^[A-Za-z\s]{2,}$/;
+          const seatPattern = /^[1-9][0-9]?[A-F]$/;
+
+          if (!form.passengerName.trim()) {
+            nextErrors.passengerName = "Passenger name is required.";
+          } else if (!namePattern.test(form.passengerName)) {
+            nextErrors.passengerName = "Use letters and spaces only.";
+          }
+
+          if (!form.email.trim()) {
+            nextErrors.email = "Email is required.";
+          }
+
+          if (!form.destination) {
+            nextErrors.destination = "Please choose a destination.";
+          }
+
+          if (!form.seatNumber.trim()) {
+            nextErrors.seatNumber = "Seat number is required.";
+          } else if (!seatPattern.test(form.seatNumber)) {
+            nextErrors.seatNumber = "Seat must look like 12A.";
+          }
+
+          if (!form.travelDate) {
+            nextErrors.travelDate = "Travel date is required.";
+          }
+
+          return nextErrors;
+        };
+
+        const handleSubmit = async (event) => {
+          event.preventDefault();
+          const nextErrors = validate();
+          setErrors(nextErrors);
+          setMessage("");
+
+          if (Object.keys(nextErrors).length !== 0) {
+            return;
+          }
+
+          const selectedFlight = flights.find((flight) => flight.to === form.destination);
+          if (!selectedFlight) {
+            setMessage("Unable to find the selected flight.");
+            return;
+          }
+
+          try {
+            setSaving(true);
+            const response = await fetch(`${API_BASE}/api/bookings`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                flightId: selectedFlight.id,
+                passengerName: form.passengerName,
+                email: form.email,
+                seatNumber: form.seatNumber,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error("Booking failed. Please try again.");
+            }
+
+            const saved = await response.json();
+            setMessage(`Booking saved! Your ID is ${saved.bookingId}.`);
+            setTicket({
+              bookingId: saved.bookingId,
+              passengerName: form.passengerName,
+              email: form.email,
+              destination: form.destination,
+              seatNumber: form.seatNumber,
+              travelDate: form.travelDate,
+              flightNumber: selectedFlight.number,
+              from: selectedFlight.from,
+              to: selectedFlight.to,
+              time: selectedFlight.time,
+            });
+            setForm({
+              passengerName: "",
+              email: "",
+              destination: "",
+              seatNumber: "",
+              travelDate: "",
+            });
+            setSeatOptions([]);
+          } catch (error) {
+            setMessage(error.message);
+          } finally {
+            setSaving(false);
+          }
+        };
+
+        const downloadTicket = () => {
+          if (!ticket) {
+            return;
+          }
+
+          const content = [
+            "FlyFast Airways Ticket",
+            `Booking ID: ${ticket.bookingId}`,
+            `Passenger: ${ticket.passengerName}`,
+            `Email: ${ticket.email}`,
+            `Route: ${ticket.from} - ${ticket.to}`,
+            `Flight: ${ticket.flightNumber}`,
+            `Departure: ${ticket.time}`,
+            `Travel date: ${ticket.travelDate}`,
+            `Seat: ${ticket.seatNumber}`,
+          ].join("\n");
+
+          const blob = new Blob([content], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `ticket-${ticket.bookingId}.txt`;
+          link.click();
+          URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div className="page">
+            <header className="site-header">
+              <div className="brand">
+                <div className="brand-mark">FF</div>
+                <div className="brand-copy">
+                  <span className="brand-title">FlyFast Airways</span>
+                  <span className="brand-subtitle">Book a flight</span>
+                </div>
+              </div>
+              <nav className="site-nav">
+                <a href="flights.html">Flights</a>
+                <a className="active" href="book.html">Book</a>
+                <a href="edit.html">Edit booking</a>
+              </nav>
+            </header>
+
+            <main className="container">
+              <h1 className="page-title">Book a flight</h1>
+              <p className="page-subtitle">Fill the form to create a booking.</p>
+
+              <section className="form-card">
+                <form onSubmit={handleSubmit} noValidate>
+                  <label className="form-row">
+                    Passenger name
+                    <input
+                      className="input"
+                      type="text"
+                      name="passengerName"
+                      value={form.passengerName}
+                      onChange={handleChange}
+                      placeholder="Name Surname"
+                      required
+                    />
+                    {errors.passengerName && <span className="error">{errors.passengerName}</span>}
+                  </label>
+
+                  <label className="form-row">
+                    Email
+                    <input
+                      className="input"
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder="alex@email.com"
+                      required
+                    />
+                    {errors.email && <span className="error">{errors.email}</span>}
+                  </label>
+
+                  <label className="form-row">
+                    Destination
+                    <select className="select" name="destination" value={form.destination} onChange={handleChange} required>
+                      <option value="">Choose a destination</option>
+                      {flights.map((flight) => (
+                        <option key={flight.number} value={flight.to}>{flight.to}</option>
+                      ))}
+                    </select>
+                    {errors.destination && <span className="error">{errors.destination}</span>}
+                  </label>
+
+                  <div className="form-row">
+                    <div className="seat-label">Seat number</div>
+                    <div className="seat-grid" role="listbox" aria-label="Seat selection">
+                      {seatOptions.length === 0 && (
+                        <div className="seat-hint">Choose a destination to see seats.</div>
+                      )}
+                      {seatOptions.map((seat) => (
+                        <button
+                          key={seat}
+                          type="button"
+                          className={`seat ${form.seatNumber === seat ? "seat-selected" : ""}`}
+                          onClick={() => handleSeatPick(seat)}
+                          disabled={!form.destination}
+                          aria-pressed={form.seatNumber === seat}
+                        >
+                          {seat}
+                        </button>
+                      ))}
+                    </div>
+                    {errors.seatNumber && <span className="error">{errors.seatNumber}</span>}
+                  </div>
+
+                  <label className="form-row">
+                    Travel date
+                    <input
+                      className="input"
+                      type="date"
+                      name="travelDate"
+                      value={form.travelDate}
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.travelDate && <span className="error">{errors.travelDate}</span>}
+                  </label>
+
+                  <button className="btn" type="submit" disabled={saving}>
+                    {saving ? "Saving..." : "Confirm booking"}
+                  </button>
+                  {message && <div className="form-message">{message}</div>}
+                </form>
+              </section>
+
+              {ticket && (
+                <section className="ticket-card">
+                  <h2 className="ticket-title">Your ticket</h2>
+                  <div className="ticket-grid">
+                    <div>
+                      <div className="ticket-label">Booking ID</div>
+                      <div>{ticket.bookingId}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Passenger</div>
+                      <div>{ticket.passengerName}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Email</div>
+                      <div>{ticket.email}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Route</div>
+                      <div>{ticket.from} - {ticket.to}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Flight</div>
+                      <div>{ticket.flightNumber}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Departure</div>
+                      <div>{ticket.time}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Travel date</div>
+                      <div>{ticket.travelDate}</div>
+                    </div>
+                    <div>
+                      <div className="ticket-label">Seat</div>
+                      <div>{ticket.seatNumber}</div>
+                    </div>
+                  </div>
+                  <button className="btn" type="button" onClick={downloadTicket}>
+                    Download ticket
+                  </button>
+                </section>
+              )}
+
+              <div className="footer">Need a flight? Check the Flights page first.</div>
+            </main>
+
+            <footer className="site-footer">
+              <div>FlyFast Airways</div>
+              <div>support@flyfast.example</div>
+              <div>Tirana International Airport (TIA)</div>
+            </footer>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("app"));
+      root.render(<BookPage />);
+    </script>
+  </body>
+</html>
